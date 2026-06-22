@@ -93,6 +93,15 @@ post_patch() {
   if [ -d "${DTS_SOURCE_DIR}" ]; then
     rsync -av "${DTS_SOURCE_DIR}/" ${PKG_BUILD}/arch/arm64/boot/dts/
   fi
+
+  # Auto-add custom DTS to kernel Makefile
+  for dts in ${PKG_BUILD}/arch/arm64/boot/dts/qcom/*.dts; do
+    [ -f "$dts" ] || continue
+    dtb=$(basename $dts .dts).dtb
+    if ! grep -qF "$dtb" ${PKG_BUILD}/arch/arm64/boot/dts/qcom/Makefile 2>/dev/null; then
+      echo "dtb-y += $dtb" >> ${PKG_BUILD}/arch/arm64/boot/dts/qcom/Makefile
+    fi
+  done
 }
 
 make_init() {
