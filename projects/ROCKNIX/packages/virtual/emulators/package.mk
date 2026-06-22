@@ -135,6 +135,10 @@ makeinstall_target() {
   ### Add bezels directory
   add_system_dir /storage/roms/bezels
 
+  ### Noto CJK Fonts
+  install_script "Install Asian Fonts.sh"
+  install_script "Install Asian Fonts - Uninstall.sh"
+
   ### Add BIOS directory
   add_system_dir /storage/roms/bios
 
