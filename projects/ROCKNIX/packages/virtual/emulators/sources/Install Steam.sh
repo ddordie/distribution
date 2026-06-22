@@ -27,6 +27,18 @@ PROTON_CACHYOS_VERSION_FULL="11.0-20260601-slr"
 PROTON_CACHYOS_TAR="proton-cachyos-${PROTON_CACHYOS_VERSION_FULL}-arm64.tar.xz"
 PROTON_CACHYOS_DIR="proton-cachyos-${PROTON_CACHYOS_VERSION_FULL}-arm64"
 PROTON_CACHYOS_URL="https://github.com/CachyOS/proton-cachyos/releases/download/cachyos-${PROTON_CACHYOS_VERSION_FULL}/${PROTON_CACHYOS_TAR}"
+GITHUB_PROXY=""
+_best=999
+for _p in https://ghfast.top/ https://gh.ddlc.top/ https://gh-proxy.com/; do
+  _t=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 --max-time 10 "${_p}https://github.com" 2>/dev/null)
+  if [ -n "$_t" ] && [ "$_t" != "0.000" ] && [ "$_t" != "0" ]; then
+    _ti=${_t%%.*}
+    if [ "$_ti" -lt "$_best" ]; then
+      _best=$_ti
+      GITHUB_PROXY="$_p"
+    fi
+  fi
+done
 unset MESA_LOADER_DRIVER_OVERRIDE
 
 # --- Logging & Error Handling Helpers ---
@@ -122,7 +134,8 @@ install_bundled_proton_files() {
 }
 
 install_proton_cachyos() {
-  local url="$PROTON_CACHYOS_URL"
+  local url="${GITHUB_PROXY}${PROTON_CACHYOS_URL}"
+  local url_fallback="${PROTON_CACHYOS_URL}"
   local dest_dir="${STEAM}/compatibilitytools.d"
   local tar_path="${dest_dir}/${PROTON_CACHYOS_TAR}"
   local extracted_dir="${dest_dir}/${PROTON_CACHYOS_DIR}"
@@ -145,7 +158,7 @@ install_proton_cachyos() {
 
   log_info "Downloading and installing Proton-CachyOS..."
   mkdir -p "${dest_dir}"
-  wget -c -t 5 -O "${tar_path}" "$url" || die "Failed to download Proton-CachyOS."
+  wget -c -t 5 -O "${tar_path}" "$url" || wget -c -t 5 -O "${tar_path}" "$url_fallback" || die "Failed to download Proton-CachyOS."
   tar -xvf "${tar_path}" -C "${dest_dir}" || die "Failed to extract Proton-CachyOS."
   rm -f "${tar_path}"
 

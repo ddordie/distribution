@@ -7,6 +7,18 @@ source /etc/profile
 HEROIC_BASE="/storage/.local/share/heroic-arm64"
 HEROIC_VERSION="2.22.0"
 HEROIC_TAR_URL="https://github.com/trescenzi/heroic_builder/releases/download/v${HEROIC_VERSION}/Heroic-${HEROIC_VERSION}-linux-arm64.tar.xz"
+GITHUB_PROXY=""
+_best=999
+for _p in https://ghfast.top/ https://gh.ddlc.top/ https://gh-proxy.com/; do
+  _t=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 --max-time 10 "${_p}https://github.com" 2>/dev/null)
+  if [ -n "$_t" ] && [ "$_t" != "0.000" ] && [ "$_t" != "0" ]; then
+    _ti=${_t%%.*}
+    if [ "$_ti" -lt "$_best" ]; then
+      _best=$_ti
+      GITHUB_PROXY="$_p"
+    fi
+  fi
+done
 HEROIC_BIN=""
 
 # This heroic resolve checks for the latest version others just use the one the fine.
@@ -60,7 +72,7 @@ if ! resolve_heroic_bin; then
   trap 'rmdir "${LOCK_DIR}" 2>/dev/null || true' EXIT
   mkdir -p "${HEROIC_BASE}"
   TMP_ARCHIVE="/tmp/heroic-arm64.tar.xz"
-  wget -c -t 5 -O "${TMP_ARCHIVE}" "${HEROIC_TAR_URL}" || exit 1
+  wget -c -t 5 -O "${TMP_ARCHIVE}" "${GITHUB_PROXY}${HEROIC_TAR_URL}" || wget -c -t 5 -O "${TMP_ARCHIVE}" "${HEROIC_TAR_URL}" || exit 1
   tar -xJf "${TMP_ARCHIVE}" -C "${HEROIC_BASE}" || exit 1
   rm -f "${TMP_ARCHIVE}"
   find /storage/.local/share/heroic-arm64 -maxdepth 1 -name "Heroic-*" ! -name "*${HEROIC_VERSION}*" -type d -exec rm -rv {} \;
