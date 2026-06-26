@@ -27,13 +27,14 @@ diff -Naur a/drivers/input/joystick/rsinput.c b/drivers/input/joystick/rsinput.c
  static const unsigned int keymap[] = {
      BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
      BTN_NORTH,   BTN_WEST,	    BTN_EAST,	   BTN_SOUTH,
-@@ -272,6 +277,69 @@
+@@ -272,6 +277,70 @@
      .receive_buf = rsinput_rx,
  };
  
 +extern int qcom_spmi_haptics_global_upload(struct ff_effect *effect);
 +extern int qcom_spmi_haptics_global_playback(int effect_id, int val);
-+
++extern int qcom_spmi_haptics_global_set_gain(u16 gain);
+
 +static u16 rsinput_strong_mag;
 +static u16 rsinput_weak_mag;
 +
@@ -93,11 +94,11 @@ diff -Naur a/drivers/input/joystick/rsinput.c b/drivers/input/joystick/rsinput.c
 +}
 +
 +static DEVICE_ATTR_RW(rumble_enable);
-+
+
  static int rsinput_probe(struct serdev_device *serdev) {
      struct rsinput_driver *drv;
      u32 gamepad_bus = 0;
-@@ -369,6 +413,17 @@
+@@ -369,6 +432,17 @@
      input_set_abs_params(drv->input, ABS_Z, 0, 1830, 0, 30);
      input_set_abs_params(drv->input, ABS_RZ, 0, 1830, 0, 30);
  
