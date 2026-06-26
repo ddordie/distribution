@@ -27,47 +27,22 @@ diff -Naur a/drivers/input/joystick/rsinput.c b/drivers/input/joystick/rsinput.c
  static const unsigned int keymap[] = {
      BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
      BTN_NORTH,   BTN_WEST,	    BTN_EAST,	   BTN_SOUTH,
-@@ -272,6 +277,70 @@
+@@ -272,6 +277,45 @@
      .receive_buf = rsinput_rx,
  };
  
 +extern int qcom_spmi_haptics_global_upload(struct ff_effect *effect);
 +extern int qcom_spmi_haptics_global_playback(int effect_id, int val);
-+extern int qcom_spmi_haptics_global_set_gain(u16 gain);
-
-+static u16 rsinput_strong_mag;
-+static u16 rsinput_weak_mag;
 +
 +static int rsinput_rumble_upload(struct input_dev *dev, struct ff_effect *effect, struct ff_effect *old) {
 +	if (!rumble_enable)
 +		return 0;
 +
-+	if (effect->type == FF_RUMBLE) {
-+		rsinput_strong_mag = effect->u.rumble.strong_magnitude;
-+		rsinput_weak_mag = effect->u.rumble.weak_magnitude;
-+		return 0;
-+	}
-+
 +	return qcom_spmi_haptics_global_upload(effect);
 +}
 +static int rsinput_rumble_play(struct input_dev *dev, int effect_id, int val) {
-+	u16 combined;
-+
 +	if (!rumble_enable)
 +		return 0;
-+
-+	if (rsinput_strong_mag || rsinput_weak_mag) {
-+		combined = (rsinput_strong_mag > rsinput_weak_mag) ?
-+			rsinput_strong_mag : rsinput_weak_mag;
-+		if (val) {
-+			qcom_spmi_haptics_global_set_gain(combined);
-+			return qcom_spmi_haptics_global_playback(0, val);
-+		} else {
-+			rsinput_strong_mag = 0;
-+			rsinput_weak_mag = 0;
-+			return qcom_spmi_haptics_global_playback(0, 0);
-+		}
-+	}
 +
 +	return qcom_spmi_haptics_global_playback(effect_id, val);
 +}
@@ -94,15 +69,15 @@ diff -Naur a/drivers/input/joystick/rsinput.c b/drivers/input/joystick/rsinput.c
 +}
 +
 +static DEVICE_ATTR_RW(rumble_enable);
-
++
  static int rsinput_probe(struct serdev_device *serdev) {
      struct rsinput_driver *drv;
      u32 gamepad_bus = 0;
-@@ -369,6 +432,17 @@
+@@ -369,6 +413,17 @@
      input_set_abs_params(drv->input, ABS_Z, 0, 1830, 0, 30);
      input_set_abs_params(drv->input, ABS_RZ, 0, 1830, 0, 30);
  
-+    input_set_capability(drv->input, EV_FF, FF_PERIODIC | FF_RUMBLE);
++    input_set_capability(drv->input, EV_FF, FF_PERIODIC);
 +
 +    error = input_ff_create(drv->input, 1);
 +    if (error) {
