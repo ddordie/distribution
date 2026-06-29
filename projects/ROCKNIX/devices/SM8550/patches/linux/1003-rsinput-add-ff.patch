@@ -77,7 +77,7 @@ diff -Naur a/drivers/input/joystick/rsinput.c b/drivers/input/joystick/rsinput.c
      input_set_abs_params(drv->input, ABS_Z, 0, 1830, 0, 30);
      input_set_abs_params(drv->input, ABS_RZ, 0, 1830, 0, 30);
  
-+    input_set_capability(drv->input, EV_FF, FF_PERIODIC);
++    input_set_capability(drv->input, EV_FF, FF_PERIODIC | FF_RUMBLE);
 +
 +    error = input_ff_create(drv->input, 1);
 +    if (error) {
