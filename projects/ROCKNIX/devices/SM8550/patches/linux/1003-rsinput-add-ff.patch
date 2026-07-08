@@ -27,7 +27,7 @@ diff -Naur a/drivers/input/joystick/rsinput.c b/drivers/input/joystick/rsinput.c
  static const unsigned int keymap[] = {
      BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
      BTN_NORTH,   BTN_WEST,	    BTN_EAST,	   BTN_SOUTH,
-@@ -272,6 +277,45 @@
+@@ -272,6 +277,64 @@
      .receive_buf = rsinput_rx,
  };
  
@@ -35,8 +35,27 @@ diff -Naur a/drivers/input/joystick/rsinput.c b/drivers/input/joystick/rsinput.c
 +extern int qcom_spmi_haptics_global_playback(int effect_id, int val);
 +
 +static int rsinput_rumble_upload(struct input_dev *dev, struct ff_effect *effect, struct ff_effect *old) {
++	struct ff_effect periodic_effect;
++
 +	if (!rumble_enable)
 +		return 0;
++
++	/* Convert FF_RUMBLE to FF_PERIODIC — haptics driver only handles PERIODIC */
++	if (effect->type == FF_RUMBLE) {
++		periodic_effect = *effect;
++		periodic_effect.type = FF_PERIODIC;
++		periodic_effect.u.periodic.waveform = FF_SINE;
++		periodic_effect.u.periodic.period = 100; /* ms */
++		periodic_effect.u.periodic.magnitude = max(effect->u.rumble.strong_magnitude,
++							   effect->u.rumble.weak_magnitude);
++		periodic_effect.u.periodic.offset = 0;
++		periodic_effect.u.periodic.phase = 0;
++		periodic_effect.u.periodic.envelope.attack_length = 0;
++		periodic_effect.u.periodic.envelope.attack_level = 0;
++		periodic_effect.u.periodic.envelope.fade_length = 0;
++		periodic_effect.u.periodic.envelope.fade_level = 0;
++		effect = &periodic_effect;
++	}
 +
 +	return qcom_spmi_haptics_global_upload(effect);
 +}
