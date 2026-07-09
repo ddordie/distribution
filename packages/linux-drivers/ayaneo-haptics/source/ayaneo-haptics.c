@@ -118,9 +118,14 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		return 0;
 	}
 
-	/* FF_RUMBLE → FF_PERIODIC, or pass through PERIODIC as-is */
+	/* Haptics driver uses old FF value encoding: PERIODIC=0x10.
+	 * Our module is compiled against 7.1 headers where PERIODIC=0x51.
+	 * Hardcode old value for compatibility. */
+#define HAPTICS_FF_PERIODIC 0x10
+
+	/* FF_RUMBLE → HAPTICS_FF_PERIODIC, or pass through PERIODIC as-is */
 	memset(&he, 0, sizeof(he));
-	he.type = FF_PERIODIC;
+	he.type = HAPTICS_FF_PERIODIC;
 	he.id   = -1;
 	if (aff->effects[effect_id].type == FF_PERIODIC) {
 		/* passthrough the PERIODIC effect directly */
