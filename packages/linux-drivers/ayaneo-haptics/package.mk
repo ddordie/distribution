@@ -18,6 +18,7 @@ PKG_IS_KERNEL_PKG="yes"
 pre_make_target() {
   unset LDFLAGS
   cp ${PKG_DIR}/source/ayaneo-haptics.c ${PKG_BUILD}/
+  cp ${PKG_DIR}/source/Makefile ${PKG_BUILD}/
 }
 
 make_target() {
