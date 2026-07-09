@@ -176,12 +176,18 @@ static void ayaneo_bridge_setup(void)
 	input_set_capability(state.controller, EV_FF, FF_RUMBLE);
 	input_set_capability(state.controller, EV_FF, FF_PERIODIC);
 
+	pr_info("ayaneo-haptics: after set_capability ffbit[0]=0x%lx ffbit[1]=0x%lx\n",
+		state.controller->ffbit[0], state.controller->ffbit[1]);
+
 	ret = input_ff_create(state.controller, MAX_EFFECTS);
 	if (ret) {
 		pr_err("ayaneo-haptics: input_ff_create failed (%d)\n", ret);
 		kfree(aff);
 		return;
 	}
+
+	pr_info("ayaneo-haptics: after ff_create ffbit[0]=0x%lx ffbit[1]=0x%lx\n",
+		state.controller->ffbit[0], state.controller->ffbit[1]);
 
 	state.controller->ff->private  = aff;
 	state.controller->ff->upload   = ayaneo_ff_upload;
