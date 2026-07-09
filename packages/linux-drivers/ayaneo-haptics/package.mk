@@ -28,6 +28,8 @@ make_target() {
 makeinstall_target() {
   mkdir -p ${INSTALL}/$(get_full_module_dir)/${PKG_NAME}
   cp ${PKG_BUILD}/ayaneo-haptics.ko ${INSTALL}/$(get_full_module_dir)/${PKG_NAME}/
+  mkdir -p ${INSTALL}/usr/lib/systemd/system
+  cp ${PKG_DIR}/source/system.d/ayaneo-haptics.service ${INSTALL}/usr/lib/systemd/system/
 }
 
 post_install() {
