@@ -23,6 +23,7 @@ struct ayaneo_state {
 struct ayaneo_ff {
 	struct ff_effect effects[MAX_EFFECTS];
 	bool used[MAX_EFFECTS];
+	int haptics_id[MAX_EFFECTS];  /* haptics driver's effect slot */
 };
 
 /* ── global singleton ── */
@@ -70,6 +71,7 @@ static int ayaneo_ff_upload(struct input_dev *dev,
 		if (!aff->used[id]) {
 			aff->effects[id] = *effect;
 			aff->used[id] = true;
+			aff->haptics_id[id] = -1;
 			effect->id = id;
 			return 0;
 		}
@@ -87,35 +89,39 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		return -EINVAL;
 
 	if (!value) {
-		input_ff_event(state.haptics, EV_FF, effect_id, 0);
+		if (aff->haptics_id[effect_id] >= 0)
+			input_ff_event(state.haptics, EV_FF,
+				       aff->haptics_id[effect_id], 0);
 		return 0;
 	}
 
 	mag = max(aff->effects[effect_id].u.rumble.strong_magnitude,
 		  aff->effects[effect_id].u.rumble.weak_magnitude);
 	if (!mag) {
-		input_ff_event(state.haptics, EV_FF, effect_id, 0);
+		if (aff->haptics_id[effect_id] >= 0)
+			input_ff_event(state.haptics, EV_FF,
+				       aff->haptics_id[effect_id], 0);
 		return 0;
 	}
 
 	/* FF_RUMBLE → FF_PERIODIC */
 	memset(&he, 0, sizeof(he));
 	he.type = FF_PERIODIC;
-	he.id   = effect_id;
+	he.id   = -1;  /* let haptics driver assign slot */
 	he.u.periodic.waveform  = FF_SINE;
 	he.u.periodic.period    = 50;
 	he.u.periodic.magnitude = mag;
 	he.direction = aff->effects[effect_id].direction;
 	he.replay    = aff->effects[effect_id].replay;
-	if (aff->effects[effect_id].replay.length > 0) {
-		he.u.periodic.envelope.attack_length =
-			aff->effects[effect_id].replay.length / 2;
-		he.u.periodic.envelope.fade_length =
-			aff->effects[effect_id].replay.length / 2;
+	if (he.replay.length > 0) {
+		he.u.periodic.envelope.attack_length = he.replay.length / 2;
+		he.u.periodic.envelope.fade_length   = he.replay.length / 2;
 	}
 
-	input_ff_upload(state.haptics, &he, NULL);
-	input_ff_event(state.haptics, EV_FF, effect_id, 1);
+	if (input_ff_upload(state.haptics, &he, NULL) == 0) {
+		aff->haptics_id[effect_id] = he.id;
+		input_ff_event(state.haptics, EV_FF, he.id, 1);
+	}
 	return 0;
 }
 
@@ -123,8 +129,12 @@ static int ayaneo_ff_erase(struct input_dev *dev, int effect_id)
 {
 	struct ayaneo_ff *aff = dev->ff->private;
 
-	if (effect_id >= 0 && effect_id < MAX_EFFECTS) {
-		input_ff_event(state.haptics, EV_FF, effect_id, 0);
+	if (effect_id >= 0 && effect_id < MAX_EFFECTS && aff->used[effect_id]) {
+		if (aff->haptics_id[effect_id] >= 0) {
+			input_ff_event(state.haptics, EV_FF,
+				       aff->haptics_id[effect_id], 0);
+			aff->haptics_id[effect_id] = -1;
+		}
 		aff->used[effect_id] = false;
 	}
 	return 0;
@@ -176,18 +186,15 @@ static int __init ayaneo_haptics_init(void)
 {
 	state = (struct ayaneo_state){0};
 
-	/* first find the haptics device — any input_dev with FF_PERIODIC */
 	class_for_each_device(&input_class, NULL, NULL, _find_haptics);
 	if (!state.haptics) {
 		pr_err("ayaneo-haptics: no haptics device found\n");
 		return -ENODEV;
 	}
 
-	/* then find the controller */
 	class_for_each_device(&input_class, NULL, NULL, _find_controller);
 	if (!state.controller) {
-		pr_err("ayaneo-haptics: no '%s' device found\n",
-		       CONTROLLER_NAME);
+		pr_err("ayaneo-haptics: no '%s' device found\n", CONTROLLER_NAME);
 		return -ENODEV;
 	}
 
