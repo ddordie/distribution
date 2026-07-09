@@ -86,6 +86,7 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 	struct ayaneo_ff *aff = dev->ff->private;
 	struct ff_effect he;
 	u16 mag;
+	int ret;
 
 	pr_info("ayaneo-haptics: playback id=%d value=%d\n", effect_id, value);
 
@@ -138,13 +139,15 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		}
 	}
 
-	if (input_ff_upload(state.haptics, &he, NULL) == 0) {
+	ret = input_ff_upload(state.haptics, &he, NULL);
+	if (ret == 0) {
 		aff->haptics_id[effect_id] = he.id;
 		pr_info("ayaneo-haptics: playback fwd id=%d mag=%u -> haptics_id=%d\n",
 			effect_id, mag, he.id);
 		input_ff_event(state.haptics, EV_FF, he.id, 1);
 	} else {
-		pr_info("ayaneo-haptics: playback upload to haptics FAILED\n");
+		pr_info("ayaneo-haptics: playback upload to haptics FAILED ret=%d (mag=%u)\n",
+			ret, mag);
 	}
 	return 0;
 }
