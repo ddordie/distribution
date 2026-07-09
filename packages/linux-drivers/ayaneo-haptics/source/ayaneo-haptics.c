@@ -162,7 +162,10 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		}
 		he.id = id;
 		ff->effect_owners[id] = (void *)1; /* marker */
+		pr_info("ayaneo-haptics: calling haptics upload id=%d type=0x%x waveform=0x%x mag=%u\n",
+			id, he.type, he.u.periodic.waveform, he.u.periodic.magnitude);
 		ret = ff->upload(state.haptics, &he, NULL);
+		pr_info("ayaneo-haptics: haptics upload returned %d\n", ret);
 		if (ret < 0)
 			ff->effect_owners[id] = NULL;
 		mutex_unlock(&ff->mutex);
