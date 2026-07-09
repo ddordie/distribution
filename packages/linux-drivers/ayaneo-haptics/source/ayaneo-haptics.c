@@ -4,7 +4,7 @@
  *
  * The Pocket S uses a USB HID "AYANEO Controller" that has no EV_FF.
  * This module patches FF_RUMBLE onto it and forwards vibration events
- * to the qcom-hv-haptics PMIC driver (input0) as FF_PERIODIC.
+ * to the qcom-hv-haptics PMIC driver as FF_PERIODIC.
  */
 
 #include <linux/input.h>
@@ -28,7 +28,8 @@ struct ayaneo_ff {
 /* ── global singleton ── */
 static struct ayaneo_state state;
 
-/* ── look up by name across the input bus ── */
+/* ── look up by name via the input class ── */
+
 static int _find_haptics(struct device *dev, void *data)
 {
 	struct input_dev *idev = to_input_dev(dev);
@@ -36,7 +37,6 @@ static int _find_haptics(struct device *dev, void *data)
 	if (!test_bit(EV_FF, idev->evbit))
 		return 0;
 	if (test_bit(FF_PERIODIC, idev->ffbit)) {
-		/* prefer the one that already has FF_PERIODIC */
 		if (!state.haptics)
 			state.haptics = idev;
 	}
@@ -49,7 +49,7 @@ static int _find_controller(struct device *dev, void *data)
 
 	if (idev->name && strstr(idev->name, CONTROLLER_NAME)) {
 		state.controller = idev;
-		return 1; /* stop iteration */
+		return 1;
 	}
 	return 0;
 }
@@ -87,14 +87,14 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		return -EINVAL;
 
 	if (!value) {
-		input_ff_event(state.haptics, effect_id, 0);
+		input_ff_event(state.haptics, EV_FF, effect_id, 0);
 		return 0;
 	}
 
 	mag = max(aff->effects[effect_id].u.rumble.strong_magnitude,
 		  aff->effects[effect_id].u.rumble.weak_magnitude);
 	if (!mag) {
-		input_ff_event(state.haptics, effect_id, 0);
+		input_ff_event(state.haptics, EV_FF, effect_id, 0);
 		return 0;
 	}
 
@@ -115,18 +115,19 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 	}
 
 	input_ff_upload(state.haptics, &he, NULL);
-	input_ff_event(state.haptics, effect_id, 1);
+	input_ff_event(state.haptics, EV_FF, effect_id, 1);
 	return 0;
 }
 
-static void ayaneo_ff_erase(struct input_dev *dev, int effect_id)
+static int ayaneo_ff_erase(struct input_dev *dev, int effect_id)
 {
 	struct ayaneo_ff *aff = dev->ff->private;
 
 	if (effect_id >= 0 && effect_id < MAX_EFFECTS) {
-		input_ff_event(state.haptics, effect_id, 0);
+		input_ff_event(state.haptics, EV_FF, effect_id, 0);
 		aff->used[effect_id] = false;
 	}
+	return 0;
 }
 
 /* ── bridge setup ── */
@@ -139,9 +140,10 @@ static void ayaneo_bridge_setup(void)
 	if (!state.controller || !state.haptics || state.bridge_active)
 		return;
 
-	pr_info("ayaneo-haptics: found '%s' (input%d) and haptics (input%d)\n",
+	pr_info("ayaneo-haptics: found '%s' (%s) and haptics (%s)\n",
 		state.controller->name ?: "?",
-		state.controller->id, state.haptics->id);
+		dev_name(&state.controller->dev),
+		dev_name(&state.haptics->dev));
 
 	aff = kzalloc(sizeof(*aff), GFP_KERNEL);
 	if (!aff)
@@ -163,8 +165,9 @@ static void ayaneo_bridge_setup(void)
 
 	state.bridge_active = true;
 	pr_info("ayaneo-haptics: FF bridge active  "
-		"RUMBLE (input%d) -> PERIODIC (input%d)\n",
-		state.controller->id, state.haptics->id);
+		"RUMBLE (%s) -> PERIODIC (%s)\n",
+		dev_name(&state.controller->dev),
+		dev_name(&state.haptics->dev));
 }
 
 /* ── module lifecycle ── */
@@ -173,17 +176,18 @@ static int __init ayaneo_haptics_init(void)
 {
 	state = (struct ayaneo_state){0};
 
-	/* first find the haptics device — pick any input_dev with FF_PERIODIC */
-	bus_for_each_dev(&input_bus_type, NULL, NULL, _find_haptics);
+	/* first find the haptics device — any input_dev with FF_PERIODIC */
+	class_for_each_device(&input_class, NULL, NULL, _find_haptics);
 	if (!state.haptics) {
 		pr_err("ayaneo-haptics: no haptics device found\n");
 		return -ENODEV;
 	}
 
 	/* then find the controller */
-	bus_for_each_dev(&input_bus_type, NULL, NULL, _find_controller);
+	class_for_each_device(&input_class, NULL, NULL, _find_controller);
 	if (!state.controller) {
-		pr_err("ayaneo-haptics: no '%s' device found\n", CONTROLLER_NAME);
+		pr_err("ayaneo-haptics: no '%s' device found\n",
+		       CONTROLLER_NAME);
 		return -ENODEV;
 	}
 
@@ -211,4 +215,4 @@ module_exit(ayaneo_haptics_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("ddordie");
-MODULE_DESCRIPTION("AYANEO Controller FF_RUMBLE → qcom-hv-haptics bridge");
+MODULE_DESCRIPTION("AYANEO Controller FF_RUMBLE -> qcom-hv-haptics bridge");
