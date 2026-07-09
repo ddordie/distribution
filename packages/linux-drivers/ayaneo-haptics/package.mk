@@ -12,6 +12,7 @@ PKG_DEPENDS_TARGET="toolchain linux"
 PKG_SECTION="driver"
 PKG_SHORTDESC="AYANEO Controller haptics bridge"
 PKG_LONGDESC="Bridges FF_RUMBLE events from AYANEO Controller (USB HID) to qcom-hv-haptics driver"
+PKG_TOOLCHAIN="manual"
 PKG_IS_KERNEL_PKG="yes"
 
 pre_make_target() {
