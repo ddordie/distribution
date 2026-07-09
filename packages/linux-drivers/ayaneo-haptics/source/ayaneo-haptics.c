@@ -144,7 +144,29 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		}
 	}
 
-	ret = input_ff_upload(state.haptics, &he, NULL);
+	/* Bypass input_ff_upload() which rejects old FF type 0x10
+	 * (below FF_EFFECT_MIN=79 in kernel 7.1). Do slot allocation
+	 * and call haptics' upload callback directly. */
+	{
+		struct ff_device *ff = state.haptics->ff;
+		int id;
+
+		mutex_lock(&ff->mutex);
+		for (id = 0; id < ff->max_effects; id++)
+			if (!ff->effect_owners[id])
+				break;
+		if (id >= ff->max_effects) {
+			mutex_unlock(&ff->mutex);
+			pr_info("ayaneo-haptics: haptics out of effect slots\n");
+			return 0;
+		}
+		he.id = id;
+		ff->effect_owners[id] = (void *)1; /* marker */
+		ret = ff->upload(state.haptics, &he, NULL);
+		if (ret < 0)
+			ff->effect_owners[id] = NULL;
+		mutex_unlock(&ff->mutex);
+	}
 	if (ret == 0) {
 		aff->haptics_id[effect_id] = he.id;
 		pr_info("ayaneo-haptics: playback fwd id=%d mag=%u -> haptics_id=%d\n",
