@@ -64,7 +64,7 @@ static int ayaneo_ff_upload(struct input_dev *dev,
 	struct ayaneo_ff *aff = dev->ff->private;
 	int id;
 
-	if (effect->type != FF_RUMBLE)
+	if (effect->type != FF_RUMBLE && effect->type != FF_PERIODIC)
 		return -EINVAL;
 
 	for (id = 0; id < MAX_EFFECTS; id++) {
@@ -73,6 +73,8 @@ static int ayaneo_ff_upload(struct input_dev *dev,
 			aff->used[id] = true;
 			aff->haptics_id[id] = -1;
 			effect->id = id;
+			pr_info("ayaneo-haptics: upload effect %d type=0x%x\n",
+				id, effect->type);
 			return 0;
 		}
 	}
@@ -95,8 +97,13 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		return 0;
 	}
 
-	mag = max(aff->effects[effect_id].u.rumble.strong_magnitude,
-		  aff->effects[effect_id].u.rumble.weak_magnitude);
+	if (aff->effects[effect_id].type == FF_RUMBLE) {
+		mag = max(aff->effects[effect_id].u.rumble.strong_magnitude,
+			  aff->effects[effect_id].u.rumble.weak_magnitude);
+	} else {
+		/* FF_PERIODIC: use magnitude directly */
+		mag = aff->effects[effect_id].u.periodic.magnitude;
+	}
 	if (!mag) {
 		if (aff->haptics_id[effect_id] >= 0)
 			input_ff_event(state.haptics, EV_FF,
@@ -104,18 +111,25 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		return 0;
 	}
 
-	/* FF_RUMBLE → FF_PERIODIC */
+	/* FF_RUMBLE → FF_PERIODIC, or pass through PERIODIC as-is */
 	memset(&he, 0, sizeof(he));
 	he.type = FF_PERIODIC;
-	he.id   = -1;  /* let haptics driver assign slot */
-	he.u.periodic.waveform  = FF_SINE;
-	he.u.periodic.period    = 50;
-	he.u.periodic.magnitude = mag;
-	he.direction = aff->effects[effect_id].direction;
-	he.replay    = aff->effects[effect_id].replay;
-	if (he.replay.length > 0) {
-		he.u.periodic.envelope.attack_length = he.replay.length / 2;
-		he.u.periodic.envelope.fade_length   = he.replay.length / 2;
+	he.id   = -1;
+	if (aff->effects[effect_id].type == FF_PERIODIC) {
+		/* passthrough the PERIODIC effect directly */
+		he.u.periodic = aff->effects[effect_id].u.periodic;
+		he.direction  = aff->effects[effect_id].direction;
+		he.replay     = aff->effects[effect_id].replay;
+	} else {
+		he.u.periodic.waveform  = FF_SINE;
+		he.u.periodic.period    = 50;
+		he.u.periodic.magnitude = mag;
+		he.direction = aff->effects[effect_id].direction;
+		he.replay    = aff->effects[effect_id].replay;
+		if (he.replay.length > 0) {
+			he.u.periodic.envelope.attack_length = he.replay.length / 2;
+			he.u.periodic.envelope.fade_length   = he.replay.length / 2;
+		}
 	}
 
 	if (input_ff_upload(state.haptics, &he, NULL) == 0) {
@@ -160,6 +174,7 @@ static void ayaneo_bridge_setup(void)
 		return;
 
 	input_set_capability(state.controller, EV_FF, FF_RUMBLE);
+	input_set_capability(state.controller, EV_FF, FF_PERIODIC);
 
 	ret = input_ff_create(state.controller, MAX_EFFECTS);
 	if (ret) {
