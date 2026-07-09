@@ -87,10 +87,16 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 	struct ff_effect he;
 	u16 mag;
 
-	if (effect_id < 0 || effect_id >= MAX_EFFECTS || !aff->used[effect_id])
+	pr_info("ayaneo-haptics: playback id=%d value=%d\n", effect_id, value);
+
+	if (effect_id < 0 || effect_id >= MAX_EFFECTS || !aff->used[effect_id]) {
+		pr_info("ayaneo-haptics: playback rejected (bad id/unused)\n");
 		return -EINVAL;
+	}
 
 	if (!value) {
+		pr_info("ayaneo-haptics: playback stop id=%d haptics_id=%d\n",
+			effect_id, aff->haptics_id[effect_id]);
 		if (aff->haptics_id[effect_id] >= 0)
 			input_ff_event(state.haptics, EV_FF,
 				       aff->haptics_id[effect_id], 0);
@@ -134,7 +140,11 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 
 	if (input_ff_upload(state.haptics, &he, NULL) == 0) {
 		aff->haptics_id[effect_id] = he.id;
+		pr_info("ayaneo-haptics: playback fwd id=%d mag=%u -> haptics_id=%d\n",
+			effect_id, mag, he.id);
 		input_ff_event(state.haptics, EV_FF, he.id, 1);
+	} else {
+		pr_info("ayaneo-haptics: playback upload to haptics FAILED\n");
 	}
 	return 0;
 }
@@ -142,6 +152,8 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 static int ayaneo_ff_erase(struct input_dev *dev, int effect_id)
 {
 	struct ayaneo_ff *aff = dev->ff->private;
+
+	pr_info("ayaneo-haptics: erase id=%d\n", effect_id);
 
 	if (effect_id >= 0 && effect_id < MAX_EFFECTS && aff->used[effect_id]) {
 		if (aff->haptics_id[effect_id] >= 0) {
