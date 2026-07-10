@@ -169,6 +169,18 @@ static void ayaneo_bridge_setup(void)
 	pr_info("ayaneo-haptics: FF bridge active (HID output report)\n");
 }
 
+/* ── Stub callbacks for graceful unload ── */
+
+static int stub_upload(struct input_dev *dev,
+		struct ff_effect *effect, struct ff_effect *old)
+{ return 0; }
+
+static int stub_playback(struct input_dev *dev, int effect_id, int value)
+{ return 0; }
+
+static int stub_erase(struct input_dev *dev, int effect_id)
+{ return 0; }
+
 /* ── module lifecycle ── */
 
 static int __init ayaneo_haptics_init(void)
@@ -191,13 +203,28 @@ static int __init ayaneo_haptics_init(void)
 static void __exit ayaneo_haptics_exit(void)
 {
 	if (state.bridge_active && state.controller) {
+		/* Prevent pending work from touching freed resources */
 		state.hid_dev = NULL;
 		cancel_work_sync(&state.rumble_work);
-		input_ff_destroy(state.controller);
+
+		/*
+		 * Replace FF callbacks with stubs instead of calling
+		 * input_ff_destroy(). Other processes (evtest, Steam, etc.)
+		 * may still hold open evdev fds referencing dev->ff.
+		 * input_ff_destroy sets dev->ff = NULL, and closing those
+		 * fds later would dereference NULL in input_ff_flush().
+		 */
+		state.controller->ff->upload   = stub_upload;
+		state.controller->ff->playback = stub_playback;
+		state.controller->ff->erase    = stub_erase;
+
+		/* Remove FF capability bits so new opens don't see FF */
 		clear_bit(EV_FF, state.controller->evbit);
 		clear_bit(FF_RUMBLE, state.controller->ffbit);
 		clear_bit(FF_CONSTANT, state.controller->ffbit);
 		clear_bit(FF_PERIODIC, state.controller->ffbit);
+
+		state.bridge_active = false;
 		pr_info("ayaneo-haptics: FF bridge removed\n");
 	}
 }
