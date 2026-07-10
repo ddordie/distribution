@@ -1,48 +1,40 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * ayaneo-haptics.c — Bridge AYANEO Controller FF_RUMBLE → qcom-hv-haptics
+ * ayaneo-haptics.c — AYANEO Controller FF_RUMBLE → HID output report
  *
- * The Pocket S uses a USB HID "AYANEO Controller" that has no EV_FF.
- * This module patches FF_RUMBLE onto it and forwards vibration events
- * to the qcom-hv-haptics PMIC driver as FF_PERIODIC.
+ * Pocket S vibration motor is embedded in the AYANEO Controller MCU
+ * and controlled via HID output report, NOT PMIC haptics (which is
+ * open-circuit on this device).
+ *
+ * Protocol: 8-byte HID output report
+ *   bytes[4] = left motor  (0=off, any non-zero=on)
+ *   bytes[5] = right motor (0=off, any non-zero=on)
+ *   rest = 0
  */
 
 #include <linux/input.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/hid.h>
 
 #define CONTROLLER_NAME "AYANEO Controller"
 #define MAX_EFFECTS 4
+#define HID_REPORT_SIZE 8
+#define LEFT_MOTOR_BYTE  4
+#define RIGHT_MOTOR_BYTE 5
 
 struct ayaneo_state {
 	struct input_dev *controller;
-	struct input_dev *haptics;
+	struct hid_device *hid_dev;
 	bool bridge_active;
 };
 
 struct ayaneo_ff {
 	struct ff_effect effects[MAX_EFFECTS];
 	bool used[MAX_EFFECTS];
-	int haptics_id[MAX_EFFECTS];  /* haptics driver's effect slot */
 };
 
-/* ── global singleton ── */
 static struct ayaneo_state state;
-
-/* ── look up by name via the input class ── */
-
-static int _find_haptics(struct device *dev, void *data)
-{
-	struct input_dev *idev = to_input_dev(dev);
-
-	if (!test_bit(EV_FF, idev->evbit))
-		return 0;
-	if (test_bit(FF_PERIODIC, idev->ffbit)) {
-		if (!state.haptics)
-			state.haptics = idev;
-	}
-	return 0;
-}
 
 static int _find_controller(struct device *dev, void *data)
 {
@@ -55,23 +47,33 @@ static int _find_controller(struct device *dev, void *data)
 	return 0;
 }
 
-/* ── FF callbacks (called on controller_dev by input core) ── */
+/* Send 8-byte HID output report. On/off only — AYANEO doesn't do variable. */
+static int send_rumble(u8 left, u8 right)
+{
+	u8 report[HID_REPORT_SIZE];
+
+	if (!state.hid_dev)
+		return -ENODEV;
+
+	memset(report, 0, HID_REPORT_SIZE);
+	report[LEFT_MOTOR_BYTE] = left;
+	report[RIGHT_MOTOR_BYTE] = right;
+
+	return hid_hw_output_report(state.hid_dev, report, HID_REPORT_SIZE);
+}
+
+/* ── FF callbacks ── */
 
 static int ayaneo_ff_upload(struct input_dev *dev,
-			    struct ff_effect *effect,
-			    struct ff_effect *old)
+		struct ff_effect *effect, struct ff_effect *old)
 {
 	struct ayaneo_ff *aff = dev->ff->private;
 	int id;
-
-	if (effect->type != FF_RUMBLE && effect->type != FF_PERIODIC)
-		return -EINVAL;
 
 	for (id = 0; id < MAX_EFFECTS; id++) {
 		if (!aff->used[id]) {
 			aff->effects[id] = *effect;
 			aff->used[id] = true;
-			aff->haptics_id[id] = -1;
 			effect->id = id;
 			pr_info("ayaneo-haptics: upload effect %d type=0x%x\n",
 				id, effect->type);
@@ -84,105 +86,33 @@ static int ayaneo_ff_upload(struct input_dev *dev,
 static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 {
 	struct ayaneo_ff *aff = dev->ff->private;
-	struct ff_effect he;
-	u16 mag;
-	int ret;
+	u16 strong = 0, weak = 0;
+
+	if (effect_id < 0 || effect_id >= MAX_EFFECTS || !aff->used[effect_id])
+		return -EINVAL;
 
 	pr_info("ayaneo-haptics: playback id=%d value=%d\n", effect_id, value);
 
-	if (effect_id < 0 || effect_id >= MAX_EFFECTS || !aff->used[effect_id]) {
-		pr_info("ayaneo-haptics: playback rejected (bad id/unused)\n");
-		return -EINVAL;
-	}
-
 	if (!value) {
-		pr_info("ayaneo-haptics: playback stop id=%d haptics_id=%d\n",
-			effect_id, aff->haptics_id[effect_id]);
-		if (aff->haptics_id[effect_id] >= 0)
-			state.haptics->ff->playback(state.haptics,
-				aff->haptics_id[effect_id], 0);
+		send_rumble(0, 0);
 		return 0;
 	}
 
-	if (aff->effects[effect_id].type == FF_RUMBLE) {
-		mag = max(aff->effects[effect_id].u.rumble.strong_magnitude,
-			  aff->effects[effect_id].u.rumble.weak_magnitude);
-	} else {
-		/* FF_PERIODIC: use magnitude directly */
-		mag = aff->effects[effect_id].u.periodic.magnitude;
-	}
-	if (!mag) {
-		if (aff->haptics_id[effect_id] >= 0) {
-			state.haptics->ff->playback(state.haptics,
-				aff->haptics_id[effect_id], 0);
-		}
-		return 0;
-	}
-
-	/* Haptics driver ffbit uses old encoding (FF_PERIODIC=0x10),
-	 * but its switch() in haptics_upload_effect uses new encoding
-	 * (FF_PERIODIC=0x51). Pass new value for the switch. */
-#define HAPTICS_FF_PERIODIC 0x51
-
-	/* FF_RUMBLE → HAPTICS_FF_PERIODIC, or pass through PERIODIC as-is */
-	memset(&he, 0, sizeof(he));
-	he.type = HAPTICS_FF_PERIODIC;
-	he.id   = -1;
-	if (aff->effects[effect_id].type == FF_PERIODIC) {
-		/* passthrough the PERIODIC effect directly */
-		he.u.periodic = aff->effects[effect_id].u.periodic;
-		he.direction  = aff->effects[effect_id].direction;
-		he.replay     = aff->effects[effect_id].replay;
-	} else {
-		he.u.periodic.waveform  = FF_SINE;
-		he.u.periodic.period    = 50;
-		he.u.periodic.magnitude = mag;
-		he.direction = aff->effects[effect_id].direction;
-		he.replay    = aff->effects[effect_id].replay;
-		if (he.replay.length > 0) {
-			he.u.periodic.envelope.attack_length = he.replay.length / 2;
-			he.u.periodic.envelope.fade_length   = he.replay.length / 2;
-		}
+	switch (aff->effects[effect_id].type) {
+	case FF_RUMBLE:
+		strong = aff->effects[effect_id].u.rumble.strong_magnitude;
+		weak   = aff->effects[effect_id].u.rumble.weak_magnitude;
+		break;
+	case FF_CONSTANT:
+		strong = aff->effects[effect_id].u.constant.level > 0
+				? 0xFFFF : 0;
+		weak = strong;
+		break;
+	default:
+		return 0; /* unsupported type, ignore */
 	}
 
-	/* Bypass input_ff_upload() which rejects old FF type 0x10
-	 * (below FF_EFFECT_MIN=79 in kernel 7.1). Do slot allocation
-	 * and call haptics' upload callback directly. */
-	{
-		struct ff_device *ff = state.haptics->ff;
-		int id;
-
-		mutex_lock(&ff->mutex);
-		for (id = 0; id < ff->max_effects; id++)
-			if (!ff->effect_owners[id])
-				break;
-		if (id >= ff->max_effects) {
-			mutex_unlock(&ff->mutex);
-			pr_info("ayaneo-haptics: haptics out of effect slots\n");
-			return 0;
-		}
-		he.id = id;
-		ff->effect_owners[id] = (void *)1; /* marker */
-		pr_info("ayaneo-haptics: calling haptics upload id=%d type=0x%x waveform=0x%x mag=%u\n",
-			id, he.type, he.u.periodic.waveform, he.u.periodic.magnitude);
-		ret = ff->upload(state.haptics, &he, NULL);
-		pr_info("ayaneo-haptics: haptics upload returned %d\n", ret);
-		if (ret < 0)
-			ff->effect_owners[id] = NULL;
-		mutex_unlock(&ff->mutex);
-	}
-	if (ret == 0) {
-		int play_ret;
-
-		aff->haptics_id[effect_id] = he.id;
-		pr_info("ayaneo-haptics: playback fwd id=%d mag=%u -> haptics_id=%d\n",
-			effect_id, mag, he.id);
-		play_ret = state.haptics->ff->playback(state.haptics, he.id, 1);
-		pr_info("ayaneo-haptics: haptics playback returned %d\n", play_ret);
-	} else {
-		pr_info("ayaneo-haptics: playback upload to haptics FAILED ret=%d (mag=%u)\n",
-			ret, mag);
-	}
+	send_rumble(strong ? 0xFF : 0, weak ? 0xFF : 0);
 	return 0;
 }
 
@@ -193,12 +123,7 @@ static int ayaneo_ff_erase(struct input_dev *dev, int effect_id)
 	pr_info("ayaneo-haptics: erase id=%d\n", effect_id);
 
 	if (effect_id >= 0 && effect_id < MAX_EFFECTS && aff->used[effect_id]) {
-		if (aff->haptics_id[effect_id] >= 0) {
-			state.haptics->ff->playback(state.haptics,
-				aff->haptics_id[effect_id], 0);
-			state.haptics->ff->effect_owners[aff->haptics_id[effect_id]] = NULL;
-			aff->haptics_id[effect_id] = -1;
-		}
+		send_rumble(0, 0);
 		aff->used[effect_id] = false;
 	}
 	return 0;
@@ -211,23 +136,28 @@ static void ayaneo_bridge_setup(void)
 	struct ayaneo_ff *aff;
 	int ret;
 
-	if (!state.controller || !state.haptics || state.bridge_active)
+	if (!state.controller || state.bridge_active)
 		return;
 
-	pr_info("ayaneo-haptics: found '%s' (%s) and haptics (%s)\n",
+	state.hid_dev = input_get_drvdata(state.controller);
+	if (!state.hid_dev) {
+		pr_err("ayaneo-haptics: cannot get hid_device from '%s'\n",
+			state.controller->name ?: "?");
+		return;
+	}
+
+	pr_info("ayaneo-haptics: found '%s' (%s), hid=%s\n",
 		state.controller->name ?: "?",
 		dev_name(&state.controller->dev),
-		dev_name(&state.haptics->dev));
+		dev_name(&state.hid_dev->dev));
 
 	aff = kzalloc(sizeof(*aff), GFP_KERNEL);
 	if (!aff)
 		return;
 
 	input_set_capability(state.controller, EV_FF, FF_RUMBLE);
+	input_set_capability(state.controller, EV_FF, FF_CONSTANT);
 	input_set_capability(state.controller, EV_FF, FF_PERIODIC);
-
-	pr_info("ayaneo-haptics: after set_capability ffbit[0]=0x%lx ffbit[1]=0x%lx\n",
-		state.controller->ffbit[0], state.controller->ffbit[1]);
 
 	ret = input_ff_create(state.controller, MAX_EFFECTS);
 	if (ret) {
@@ -236,19 +166,13 @@ static void ayaneo_bridge_setup(void)
 		return;
 	}
 
-	pr_info("ayaneo-haptics: after ff_create ffbit[0]=0x%lx ffbit[1]=0x%lx\n",
-		state.controller->ffbit[0], state.controller->ffbit[1]);
-
 	state.controller->ff->private  = aff;
 	state.controller->ff->upload   = ayaneo_ff_upload;
 	state.controller->ff->playback = ayaneo_ff_playback;
 	state.controller->ff->erase    = ayaneo_ff_erase;
 
 	state.bridge_active = true;
-	pr_info("ayaneo-haptics: FF bridge active  "
-		"RUMBLE (%s) -> PERIODIC (%s)\n",
-		dev_name(&state.controller->dev),
-		dev_name(&state.haptics->dev));
+	pr_info("ayaneo-haptics: FF bridge active (HID output report)\n");
 }
 
 /* ── module lifecycle ── */
@@ -256,12 +180,6 @@ static void ayaneo_bridge_setup(void)
 static int __init ayaneo_haptics_init(void)
 {
 	state = (struct ayaneo_state){0};
-
-	class_for_each_device(&input_class, NULL, NULL, _find_haptics);
-	if (!state.haptics) {
-		pr_err("ayaneo-haptics: no haptics device found\n");
-		return -ENODEV;
-	}
 
 	class_for_each_device(&input_class, NULL, NULL, _find_controller);
 	if (!state.controller) {
@@ -280,10 +198,14 @@ static void __exit ayaneo_haptics_exit(void)
 {
 	if (state.bridge_active && state.controller) {
 		struct ayaneo_ff *aff = state.controller->ff->private;
+
+		send_rumble(0, 0);
 		input_ff_destroy(state.controller);
 		kfree(aff);
 		clear_bit(EV_FF, state.controller->evbit);
 		clear_bit(FF_RUMBLE, state.controller->ffbit);
+		clear_bit(FF_CONSTANT, state.controller->ffbit);
+		clear_bit(FF_PERIODIC, state.controller->ffbit);
 		pr_info("ayaneo-haptics: FF bridge removed\n");
 	}
 }
@@ -293,4 +215,4 @@ module_exit(ayaneo_haptics_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("ddordie");
-MODULE_DESCRIPTION("AYANEO Controller FF_RUMBLE -> qcom-hv-haptics bridge");
+MODULE_DESCRIPTION("AYANEO Controller FF → HID output report bridge");

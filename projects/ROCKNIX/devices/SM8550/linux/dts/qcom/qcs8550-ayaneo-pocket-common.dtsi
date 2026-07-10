@@ -981,7 +981,7 @@
 		qcom,brake-sig-shape = <WF_SINE>;
 		nvmem-names = "hap_cfg_sdam";
 		nvmem = <&pmk8550_sdam_9d00>;
-		status = "ok";
+		status = "disabled";
 
 		hap_swr_slave_reg: qcom,hap-swr-slave-reg {
 			regulator-name = "hap-swr-slave-reg";
