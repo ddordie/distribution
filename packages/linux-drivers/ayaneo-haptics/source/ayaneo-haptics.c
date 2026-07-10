@@ -117,7 +117,7 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		return 0;
 	}
 
-	schedule_rumble(strong ? 0xFF : 0, weak ? 0xFF : 0);
+	schedule_rumble(strong >> 8, weak >> 8);
 	return 0;
 }
 
