@@ -979,7 +979,6 @@
 		qcom,lra-period-us = <5880>;
 		qcom,drv-sig-shape = <WF_SINE>;
 		qcom,brake-sig-shape = <WF_SINE>;
-		qcom,use-erm = <0x01>;
 		nvmem-names = "hap_cfg_sdam";
 		nvmem = <&pmk8550_sdam_9d00>;
 		status = "ok";
