@@ -58,11 +58,15 @@ static void rumble_work_fn(struct work_struct *work)
 	report[RIGHT_MOTOR_BYTE] = state.cur_right;
 
 	ret = hid_hw_output_report(state.hid_dev, report, HID_REPORT_SIZE);
-	if (ret < 0)
+	if (ret < 0) {
 		pr_err("ayaneo-haptics: hid_hw_output_report failed: %d\n", ret);
-	else
+		/* Device gone — stop trying */
+		if (ret == -ENODEV)
+			state.hid_dev = NULL;
+	} else {
 		pr_info("ayaneo-haptics: HID report sent: L=%02x R=%02x\n",
 			state.cur_left, state.cur_right);
+	}
 }
 
 static void schedule_rumble(u8 left, u8 right)
@@ -207,15 +211,17 @@ static int __init ayaneo_haptics_init(void)
 
 static void __exit ayaneo_haptics_exit(void)
 {
+	/*
+	 * Shutdown path: cancel pending work FIRST, then tear down.
+	 * Do NOT touch hid_dev — the HID device may already be freed
+	 * by the USB subsystem during shutdown.
+	 */
 	if (state.bridge_active && state.controller) {
 		struct ayaneo_ff *aff = state.controller->ff->private;
 
+		state.hid_dev = NULL;  /* prevent pending work from touching it */
 		cancel_work_sync(&state.rumble_work);
-		/* Send stop command */
-		if (state.hid_dev) {
-			u8 report[HID_REPORT_SIZE] = {0};
-			hid_hw_output_report(state.hid_dev, report, HID_REPORT_SIZE);
-		}
+
 		input_ff_destroy(state.controller);
 		kfree(aff);
 		clear_bit(EV_FF, state.controller->evbit);
