@@ -2,17 +2,9 @@
 /*
  * ayaneo-haptics.c — AYANEO Controller FF_RUMBLE → HID output report
  *
- * Pocket S vibration motor is embedded in the AYANEO Controller MCU
- * and controlled via HID output report, NOT PMIC haptics.
- *
- * Protocol: 8-byte HID output report
- *   bytes[4] = left motor  (0=off, any non-zero=on)
- *   bytes[5] = right motor (0=off, any non-zero=on)
- *   rest = 0
- *
- * IMPORTANT: hid_hw_output_report() may sleep (USB control transfer),
- * so we defer all HID I/O to a workqueue. FF callbacks are called
- * under event_lock spinlock and must not block.
+ * Deferred-workqueue design (no sleeps in FF callbacks):
+ *   FF callback → set cur_left/cur_right → schedule_work()
+ *   Workqueue  → hid_hw_output_report()
  */
 
 #include <linux/input.h>
@@ -20,14 +12,12 @@
 #include <linux/slab.h>
 #include <linux/hid.h>
 #include <linux/workqueue.h>
-#include <linux/jiffies.h>
 
 #define CONTROLLER_NAME "AYANEO Controller"
 #define MAX_EFFECTS 4
 #define HID_REPORT_SIZE 8
 #define LEFT_MOTOR_BYTE  4
 #define RIGHT_MOTOR_BYTE 5
-#define RUMBLE_TIMEOUT_MS 5000  /* safety: auto-stop after 5s */
 
 struct ayaneo_state {
 	struct input_dev *controller;
@@ -36,7 +26,6 @@ struct ayaneo_state {
 	struct work_struct rumble_work;
 	u8 cur_left;
 	u8 cur_right;
-	struct delayed_work stop_work;
 };
 
 struct ayaneo_ff {
@@ -49,7 +38,6 @@ static struct ayaneo_state state;
 static int _find_controller(struct device *dev, void *data)
 {
 	struct input_dev *idev = to_input_dev(dev);
-
 	if (idev->name && strstr(idev->name, CONTROLLER_NAME)) {
 		state.controller = idev;
 		return 1;
@@ -57,10 +45,10 @@ static int _find_controller(struct device *dev, void *data)
 	return 0;
 }
 
-/* Runs in workqueue context — safe to sleep (USB I/O) */
 static void rumble_work_fn(struct work_struct *work)
 {
 	u8 report[HID_REPORT_SIZE];
+	int ret;
 
 	if (!state.hid_dev)
 		return;
@@ -69,35 +57,22 @@ static void rumble_work_fn(struct work_struct *work)
 	report[LEFT_MOTOR_BYTE]  = state.cur_left;
 	report[RIGHT_MOTOR_BYTE] = state.cur_right;
 
-	hid_hw_output_report(state.hid_dev, report, HID_REPORT_SIZE);
+	ret = hid_hw_output_report(state.hid_dev, report, HID_REPORT_SIZE);
+	if (ret < 0)
+		pr_err("ayaneo-haptics: hid_hw_output_report failed: %d\n", ret);
+	else
+		pr_info("ayaneo-haptics: HID report sent: L=%02x R=%02x\n",
+			state.cur_left, state.cur_right);
 }
 
-static void stop_work_fn(struct work_struct *work)
-{
-	state.cur_left  = 0;
-	state.cur_right = 0;
-	schedule_work(&state.rumble_work);
-}
-
-/* Schedule a rumble update (non-blocking, safe from any context) */
 static void schedule_rumble(u8 left, u8 right)
 {
 	state.cur_left  = left;
 	state.cur_right = right;
-
-	/* Cancel any pending auto-stop */
-	cancel_delayed_work(&state.stop_work);
-
-	/* Schedule the HID write */
 	schedule_work(&state.rumble_work);
-
-	/* If rumbling, schedule auto-stop safety net */
-	if (left || right)
-		schedule_delayed_work(&state.stop_work,
-			msecs_to_jiffies(RUMBLE_TIMEOUT_MS));
 }
 
-/* ── FF callbacks (called under event_lock — MUST NOT block) ── */
+/* ── FF callbacks (no sleeps, no locks) ── */
 
 static int ayaneo_ff_upload(struct input_dev *dev,
 		struct ff_effect *effect, struct ff_effect *old)
@@ -190,7 +165,6 @@ static void ayaneo_bridge_setup(void)
 		return;
 
 	INIT_WORK(&state.rumble_work, rumble_work_fn);
-	INIT_DELAYED_WORK(&state.stop_work, stop_work_fn);
 
 	input_set_capability(state.controller, EV_FF, FF_RUMBLE);
 	input_set_capability(state.controller, EV_FF, FF_CONSTANT);
@@ -236,9 +210,8 @@ static void __exit ayaneo_haptics_exit(void)
 	if (state.bridge_active && state.controller) {
 		struct ayaneo_ff *aff = state.controller->ff->private;
 
-		cancel_delayed_work_sync(&state.stop_work);
 		cancel_work_sync(&state.rumble_work);
-		/* Send stop command synchronously before cleanup */
+		/* Send stop command */
 		if (state.hid_dev) {
 			u8 report[HID_REPORT_SIZE] = {0};
 			hid_hw_output_report(state.hid_dev, report, HID_REPORT_SIZE);
