@@ -177,7 +177,7 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		aff->haptics_id[effect_id] = he.id;
 		pr_info("ayaneo-haptics: playback fwd id=%d mag=%u -> haptics_id=%d\n",
 			effect_id, mag, he.id);
-		play_ret = ff->playback(state.haptics, he.id, 1);
+		play_ret = state.haptics->ff->playback(state.haptics, he.id, 1);
 		pr_info("ayaneo-haptics: haptics playback returned %d\n", play_ret);
 	} else {
 		pr_info("ayaneo-haptics: playback upload to haptics FAILED ret=%d (mag=%u)\n",
