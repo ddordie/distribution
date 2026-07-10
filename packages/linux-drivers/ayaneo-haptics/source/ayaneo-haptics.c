@@ -98,9 +98,9 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 	if (!value) {
 		pr_info("ayaneo-haptics: playback stop id=%d haptics_id=%d\n",
 			effect_id, aff->haptics_id[effect_id]);
-		if (aff->haptics_id[effect_id] >= 0)
-			input_ff_event(state.haptics, EV_FF,
-				       aff->haptics_id[effect_id], 0);
+		if (aff->haptics_id[effect_id] >= 0) {
+			state.haptics->ff->playback(state.haptics,
+				aff->haptics_id[effect_id], 0);
 		return 0;
 	}
 
@@ -112,9 +112,10 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		mag = aff->effects[effect_id].u.periodic.magnitude;
 	}
 	if (!mag) {
-		if (aff->haptics_id[effect_id] >= 0)
-			input_ff_event(state.haptics, EV_FF,
-				       aff->haptics_id[effect_id], 0);
+		if (aff->haptics_id[effect_id] >= 0) {
+			state.haptics->ff->playback(state.haptics,
+				aff->haptics_id[effect_id], 0);
+		}
 		return 0;
 	}
 
@@ -171,10 +172,13 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 		mutex_unlock(&ff->mutex);
 	}
 	if (ret == 0) {
+		int play_ret;
+
 		aff->haptics_id[effect_id] = he.id;
 		pr_info("ayaneo-haptics: playback fwd id=%d mag=%u -> haptics_id=%d\n",
 			effect_id, mag, he.id);
-		input_ff_event(state.haptics, EV_FF, he.id, 1);
+		play_ret = ff->playback(state.haptics, he.id, 1);
+		pr_info("ayaneo-haptics: haptics playback returned %d\n", play_ret);
 	} else {
 		pr_info("ayaneo-haptics: playback upload to haptics FAILED ret=%d (mag=%u)\n",
 			ret, mag);
@@ -190,8 +194,9 @@ static int ayaneo_ff_erase(struct input_dev *dev, int effect_id)
 
 	if (effect_id >= 0 && effect_id < MAX_EFFECTS && aff->used[effect_id]) {
 		if (aff->haptics_id[effect_id] >= 0) {
-			input_ff_event(state.haptics, EV_FF,
-				       aff->haptics_id[effect_id], 0);
+			state.haptics->ff->playback(state.haptics,
+				aff->haptics_id[effect_id], 0);
+			state.haptics->ff->effect_owners[aff->haptics_id[effect_id]] = NULL;
 			aff->haptics_id[effect_id] = -1;
 		}
 		aff->used[effect_id] = false;
