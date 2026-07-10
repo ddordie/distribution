@@ -5,6 +5,9 @@
  * Deferred-workqueue design (no sleeps in FF callbacks):
  *   FF callback → set cur_left/cur_right → schedule_work()
  *   Workqueue  → hid_hw_output_report()
+ *
+ * Effect storage is the kernel FF core's dev->ff->effects[] —
+ * we don't maintain a separate slot array to avoid misalignment.
  */
 
 #include <linux/input.h>
@@ -26,11 +29,6 @@ struct ayaneo_state {
 	struct work_struct rumble_work;
 	u8 cur_left;
 	u8 cur_right;
-};
-
-struct ayaneo_ff {
-	struct ff_effect effects[MAX_EFFECTS];
-	bool used[MAX_EFFECTS];
 };
 
 static struct ayaneo_state state;
@@ -60,7 +58,6 @@ static void rumble_work_fn(struct work_struct *work)
 	ret = hid_hw_output_report(state.hid_dev, report, HID_REPORT_SIZE);
 	if (ret < 0) {
 		pr_err("ayaneo-haptics: hid_hw_output_report failed: %d\n", ret);
-		/* Device gone — stop trying */
 		if (ret == -ENODEV)
 			state.hid_dev = NULL;
 	} else {
@@ -76,49 +73,44 @@ static void schedule_rumble(u8 left, u8 right)
 	schedule_work(&state.rumble_work);
 }
 
-/* ── FF callbacks (no sleeps, no locks) ── */
+/* ── FF callbacks ── */
 
 static int ayaneo_ff_upload(struct input_dev *dev,
 		struct ff_effect *effect, struct ff_effect *old)
 {
-	struct ayaneo_ff *aff = dev->ff->private;
-	int id;
-
-	for (id = 0; id < MAX_EFFECTS; id++) {
-		if (!aff->used[id]) {
-			aff->effects[id] = *effect;
-			aff->used[id] = true;
-			effect->id = id;
-			pr_info("ayaneo-haptics: upload effect %d type=0x%x\n",
-				id, effect->type);
-			return 0;
-		}
-	}
-	return -ENOSPC;
+	/* Let the kernel FF core store the effect in dev->ff->effects[].
+	 * We read it back via dev->ff->effects[effect_id] in playback. */
+	pr_info("ayaneo-haptics: upload effect type=0x%x (old=%s)\n",
+		effect->type, old ? "yes" : "no");
+	return 0;
 }
 
 static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 {
-	struct ayaneo_ff *aff = dev->ff->private;
+	struct ff_effect *effect;
 	u16 strong = 0, weak = 0;
 
-	if (effect_id < 0 || effect_id >= MAX_EFFECTS || !aff->used[effect_id])
+	if (effect_id < 0 || effect_id >= dev->ff->max_effects)
 		return -EINVAL;
 
-	pr_info("ayaneo-haptics: playback id=%d value=%d\n", effect_id, value);
+	/* Read directly from FF core's effect array — always in sync */
+	effect = &dev->ff->effects[effect_id];
+
+	pr_info("ayaneo-haptics: playback id=%d value=%d type=0x%x\n",
+		effect_id, value, effect->type);
 
 	if (!value) {
 		schedule_rumble(0, 0);
 		return 0;
 	}
 
-	switch (aff->effects[effect_id].type) {
+	switch (effect->type) {
 	case FF_RUMBLE:
-		strong = aff->effects[effect_id].u.rumble.strong_magnitude;
-		weak   = aff->effects[effect_id].u.rumble.weak_magnitude;
+		strong = effect->u.rumble.strong_magnitude;
+		weak   = effect->u.rumble.weak_magnitude;
 		break;
 	case FF_CONSTANT:
-		strong = aff->effects[effect_id].u.constant.level;
+		strong = effect->u.constant.level;
 		weak = strong;
 		break;
 	default:
@@ -131,14 +123,8 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 
 static int ayaneo_ff_erase(struct input_dev *dev, int effect_id)
 {
-	struct ayaneo_ff *aff = dev->ff->private;
-
 	pr_info("ayaneo-haptics: erase id=%d\n", effect_id);
-
-	if (effect_id >= 0 && effect_id < MAX_EFFECTS && aff->used[effect_id]) {
-		schedule_rumble(0, 0);
-		aff->used[effect_id] = false;
-	}
+	schedule_rumble(0, 0);
 	return 0;
 }
 
@@ -146,7 +132,6 @@ static int ayaneo_ff_erase(struct input_dev *dev, int effect_id)
 
 static void ayaneo_bridge_setup(void)
 {
-	struct ayaneo_ff *aff;
 	int ret;
 
 	if (!state.controller || state.bridge_active)
@@ -164,10 +149,6 @@ static void ayaneo_bridge_setup(void)
 		dev_name(&state.controller->dev),
 		dev_name(&state.hid_dev->dev));
 
-	aff = kzalloc(sizeof(*aff), GFP_KERNEL);
-	if (!aff)
-		return;
-
 	INIT_WORK(&state.rumble_work, rumble_work_fn);
 
 	input_set_capability(state.controller, EV_FF, FF_RUMBLE);
@@ -177,11 +158,9 @@ static void ayaneo_bridge_setup(void)
 	ret = input_ff_create(state.controller, MAX_EFFECTS);
 	if (ret) {
 		pr_err("ayaneo-haptics: input_ff_create failed (%d)\n", ret);
-		kfree(aff);
 		return;
 	}
 
-	state.controller->ff->private  = aff;
 	state.controller->ff->upload   = ayaneo_ff_upload;
 	state.controller->ff->playback = ayaneo_ff_playback;
 	state.controller->ff->erase    = ayaneo_ff_erase;
@@ -211,19 +190,10 @@ static int __init ayaneo_haptics_init(void)
 
 static void __exit ayaneo_haptics_exit(void)
 {
-	/*
-	 * Shutdown path: cancel pending work FIRST, then tear down.
-	 * Do NOT touch hid_dev — the HID device may already be freed
-	 * by the USB subsystem during shutdown.
-	 */
 	if (state.bridge_active && state.controller) {
-		struct ayaneo_ff *aff = state.controller->ff->private;
-
-		state.hid_dev = NULL;  /* prevent pending work from touching it */
+		state.hid_dev = NULL;
 		cancel_work_sync(&state.rumble_work);
-
 		input_ff_destroy(state.controller);
-		kfree(aff);
 		clear_bit(EV_FF, state.controller->evbit);
 		clear_bit(FF_RUMBLE, state.controller->ffbit);
 		clear_bit(FF_CONSTANT, state.controller->ffbit);
