@@ -955,6 +955,13 @@
 	};
 };
 
+&pmk8550 {
+	pmk8550_sdam_9d00: nvram@9d00 {
+		compatible = "qcom,spmi-sdam";
+		reg = <0x9d00>;
+	};
+};
+
 &pm8550b_eusb2_repeater {
 	vdd18-supply = <&vreg_l15b_1p8>;
 	vdd3-supply = <&vreg_l5b_3p1>;
@@ -973,7 +980,13 @@
 		qcom,drv-sig-shape = <WF_SINE>;
 		qcom,brake-sig-shape = <WF_SINE>;
 		qcom,use-erm = <0x01>;
+		nvmem-names = "hap_cfg_sdam";
+		nvmem = <&pmk8550_sdam_9d00>;
 		status = "ok";
+
+		hap_swr_slave_reg: qcom,hap-swr-slave-reg {
+			regulator-name = "hap-swr-slave-reg";
+		};
 	};
 };
 
