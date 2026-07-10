@@ -98,7 +98,7 @@ static int ayaneo_ff_playback(struct input_dev *dev, int effect_id, int value)
 	if (!value) {
 		pr_info("ayaneo-haptics: playback stop id=%d haptics_id=%d\n",
 			effect_id, aff->haptics_id[effect_id]);
-		if (aff->haptics_id[effect_id] >= 0) {
+		if (aff->haptics_id[effect_id] >= 0)
 			state.haptics->ff->playback(state.haptics,
 				aff->haptics_id[effect_id], 0);
 		return 0;
