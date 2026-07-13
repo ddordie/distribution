@@ -18,6 +18,9 @@ PKG_LONGDESC="The SPIR-V Tools project provides an API and commands for processi
 PKG_CMAKE_OPTS_HOST="-DSPIRV_SKIP_TESTS=ON"
 
 post_unpack() {
+  # GCC 15: disable -Werror (array-bounds false positive)
+  sed -i 's/option(SPIRV_WERROR "Enable error on warning" ON)/option(SPIRV_WERROR "Enable error on warning" OFF)/' ${PKG_BUILD}/CMakeLists.txt
+
   mkdir -p ${PKG_BUILD}/external/spirv-headers
     tar --strip-components=1 \
       -xf "${SOURCES}/spirv-headers/spirv-headers-$(get_pkg_version spirv-headers).tar.gz" \
