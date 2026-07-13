@@ -10,3 +10,4 @@ PKG_DEPENDS_TARGET="toolchain libtool"
 PKG_BUILD_FLAGS="+pic"
 PKG_TOOLCHAIN="configure"
 
+PKG_MAKEINSTALL_OPTS_TARGET=" -j1"
