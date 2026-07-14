@@ -48,10 +48,8 @@ options:
   auto_manage: true
 
 # The target input device(s) to emulate by default.
-# ds5-edge (DualSense Edge) rather than plain ds5: the Edge is the DualSense
-# variant with back paddles, so the Odin 3's physical back paddles can be
-# emitted as the Edge's real removable back-lever buttons (see ayn_mcu.yaml;
-# decoded by the hid-playstation Edge support in patches/mainline/0006).
+# deck (Steam Deck controller): standard ForceFeedback vibration + gyro +
+# accelerometer + dual touchpads + 4 back paddles (L4/L5/R4/R5).
 target_devices:
-  - ds5-edge
+  - deck
   - keyboard
