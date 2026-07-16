@@ -1,0 +1,25 @@
+From: Hermes <hermes@localhost>
+Subject: [PATCH] arm64: dts: qcom: sm8750: increase GPU microcode reserved memory
+
+The upstream sm8750.dtsi allocates only 8 KiB (0x2000) for GPU microcode,
+but the Adreno 830 ZAP shader firmware (gen80000_zap.mbn) is ~12 KB in
+MDT format which requires more memory for page-aligned segment loading.
+
+Without sufficient reserved memory, zap_shader_load_mdt() fails silently,
+the GPU stays in secure mode, and Vulkan/Gallium initialization fails
+with "CP group not found", falling back to softpipe rendering.
+
+Extend the region from 0x2000 to 0x6000 (24 KiB), which fits before the
+adjacent spss region at 0x9b0a0000.
+
+Signed-off-by: Hermes <hermes@localhost>
+---
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -452,7 +452,7 @@
+ 
+ 		gpu_micro_code_mem: gpu-micro-code@9b09a000 {
+-			reg = <0x0 0x9b09a000 0x0 0x2000>;
++			reg = <0x0 0x9b09a000 0x0 0x6000>;
+ 			no-map;
+ 		};
