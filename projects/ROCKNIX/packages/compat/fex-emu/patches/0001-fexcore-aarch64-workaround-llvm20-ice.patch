@@ -1,0 +1,12 @@
+--- a/FEXCore/Source/CMakeLists.txt
++++ b/FEXCore/Source/CMakeLists.txt
+@@ -257,6 +257,10 @@
+ 
+ # Build FEXCore_Base static library
+ add_library(FEXCore_Base STATIC ${FEXCORE_BASE_SRCS})
++set_source_files_properties(
++    Interface/Core/Interpreter/Fallbacks/InterpreterFallbacks.cpp
++    PROPERTIES COMPILE_FLAGS "-O0 -fno-lto"
++)
+ target_link_libraries(FEXCore_Base PUBLIC ${LIBS})
+ AddDefaultOptionsToTarget(FEXCore_Base)
