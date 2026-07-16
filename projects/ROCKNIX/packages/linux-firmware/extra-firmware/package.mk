@@ -15,6 +15,7 @@ makeinstall_target() {
   case "${DEVICE}" in
     "SM6115") cp -a SM6115/* ${INSTALL}/$(get_full_firmware_dir) ;;
     "SM8250") cp -a SM8250/* ${INSTALL}/$(get_full_firmware_dir) ;;
-    "SM8750") cp -a SM8750/* ${INSTALL}/$(get_full_firmware_dir) ;;
+    "SM8750") cp -a SM8750/* ${INSTALL}/$(get_full_firmware_dir)
+              cp SM8750/qcom/sm8750/gen80000_zap.mbn ${INSTALL}/$(get_full_firmware_dir)/qcom/gen80000_zap.mbn ;;
   esac
 }

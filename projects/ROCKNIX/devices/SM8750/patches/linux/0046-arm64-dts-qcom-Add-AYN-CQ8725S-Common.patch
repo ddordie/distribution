@@ -14,7 +14,7 @@ new file mode 100644
 index 000000000000..6090b5b3c668
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
-@@ -0,0 +1,1237 @@
+@@ -0,0 +1,1235 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Copyright (c) 2026 Teguh Sobirin.
@@ -844,9 +844,7 @@ index 000000000000..6090b5b3c668
 +};
 +
 +&gpu_zap_shader {
-+	firmware-name = "gen80000_zap.mbn";
 +};
-+
 +&i2c3 {
 +	status = "okay";
 +
