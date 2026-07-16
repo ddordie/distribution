@@ -1,0 +1,25 @@
+From: Hermes <hermes@localhost>
+Subject: [PATCH] firmware: qcom_scm: add AYN Odin3 to QSEECOM allowlist
+
+QSEECOM is required for ZAP shader loading which brings the GPU's
+command processor out of secure mode. Without QSEECOM the Adreno 830
+stays locked, Turnip fails with "CP group not found", and all GL
+rendering falls back to softpipe.
+
+Add "ayn,odin3" to the machine allowlist so that QSEECOM interfaces
+are properly initialized on the Odin3.
+
+Signed-off-by: Hermes <hermes@localhost>
+---
+diff --git a/drivers/firmware/qcom/qcom_scm.c b/drivers/firmware/qcom/qcom_scm.c
+index xxxxxxx..yyyyyyy 100644
+--- a/drivers/firmware/qcom/qcom_scm.c
++++ b/drivers/firmware/qcom/qcom_scm.c
+@@ -2288,6 +2288,7 @@
+  */
+ static const struct of_device_id qcom_scm_qseecom_allowlist[] __maybe_unused = {
+ 	{ .compatible = "asus,vivobook-s15" },
++	{ .compatible = "ayn,odin3" },
+ 	{ .compatible = "asus,vivobook-s15-x1p4" },
+ 	{ .compatible = "asus,zenbook-a14-ux3407qa" },
+ 	{ .compatible = "asus,zenbook-a14-ux3407ra" },
