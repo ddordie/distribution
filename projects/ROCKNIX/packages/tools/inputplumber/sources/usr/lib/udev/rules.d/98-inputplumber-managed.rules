@@ -1,0 +1,4 @@
+# Mark devices managed by InputPlumber so SDL2/Steam ignore them
+ACTION=="add|change", SUBSYSTEM=="input", ATTRS{idVendor}=="4001", ATTRS{idProduct}=="0428", ENV{ID_INPUT_JOYSTICK}="0", TAG+="inputplumber"
+ACTION=="add|change", SUBSYSTEM=="input", ATTRS{idVendor}=="1c4f", ATTRS{idProduct}=="0002", ENV{ID_INPUT_JOYSTICK}="0", TAG+="inputplumber"
+ACTION=="add|change", SUBSYSTEM=="input", ATTRS{idVendor}=="045e", ATTRS{idProduct}=="028e", ENV{ID_INPUT_JOYSTICK}="0", TAG+="inputplumber"

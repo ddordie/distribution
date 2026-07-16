@@ -7,6 +7,9 @@
 export XDG_RUNTIME_DIR=/var/run/0-runtime-dir
 export PATH="/usr/bin:/usr/local/bin:/storage/bin:${PATH}"
 export SDL_GAMECONTROLLERCONFIG_FILE="/storage/.config/SDL-GameControllerDB/gamecontrollerdb.txt"
+# Hide physical AYANEO controller from SDL2 (managed by InputPlumber)
+export SDL_JOYSTICK_HIDAPI_IGNORE_DEVICES="0x4001/0x0428"
+export SDL_GAMECONTROLLER_IGNORE_DEVICES="0x4001/0x0428"
 
 J_DIR="/storage/.config/system"
 J_CONF="${J_DIR}/configs/system.cfg"

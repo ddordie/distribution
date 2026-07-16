@@ -6,61 +6,58 @@ version: 1
 kind: CompositeDevice
 
 # Name of the composite device mapping
-name: AYANEO Layout
+name: GPD Win4
+
+# Only allow a single source device per composite device of this type.
+single_source: false
 
 # Only use this profile if *any* of the given matches matches. If this list is
 # empty, then the source devices will *always* be checked.
 # /sys/class/dmi/id/product_name
 matches:
-  - udev:
-      sys_path: /sys/firmware/devicetree/base
-      attributes:
-        - name: model
-          value: AYANEO Pocket EVO
-  - udev:
-      sys_path: /sys/firmware/devicetree/base
-      attributes:
-        - name: model
-          value: AYANEO Pocket DS
-  - udev:
-      sys_path: /sys/firmware/devicetree/base
-      attributes:
-        - name: model
-          value: AYANEO Pocket S 2K
-  - udev:
-      sys_path: /sys/firmware/devicetree/base
-      attributes:
-        - name: model
-          value: AYANEO Pocket S 1K
-
-# Only allow a single source device per composite device of this type.
-single_source: false
+  - dmi_data:
+      product_name: G1618-04
+      sys_vendor: GPD
 
 # One or more source devices to combine into a single virtual device. The events
 # from these devices will be watched and translated according to the key map.
 source_devices:
-  - group: gamepad
-    hidraw:
-      vendor_id: 0x4001
-      product_id: 0x0428
+  # GPD Win4 2022 (6800U)
   - group: gamepad
     evdev:
-      vendor_id: "4001"
-      product_id: "0428"
+      name: "Microsoft X-Box 360 pad"
+      phys_path: usb-0000:73:00.3-4.1/input0
       handler: event*
-    capability_map_id: ayaneo_mcu_xbox
+  - group: keyboard
+    evdev:
+      name: "  Mouse for Windows"
+      handler: event*
+      phys_path: usb-0000:73:00.3-4.2/input1
+  - group: imu
+    iio:
+      name: "{i2c-BMI0160:00,bmi260}"
+      mount_matrix:
+        x: [-1, 0, 0]
+        y: [0, -1, 0]
+        z: [0, 0, 1]
+  # GPD Win4 2025 (HX 370)
   - group: gamepad
     evdev:
-      vendor_id: "1c4f"
-      product_id: "0002"
+      name: "Microsoft X-Box 360 pad"
+      phys_path: usb-0000:66:00.0-2.1/input0
       handler: event*
-    capability_map_id: ayaneo_mcu_xbox
-  - group: gamepad
+  - group: keyboard
     evdev:
-      vendor_id: "045e"
-      product_id: "028e"
+      name: "  Mouse for Windows"
       handler: event*
-    capability_map_id: ayaneo_mcu_xbox
+      phys_path: usb-0000:66:00.0-2.2/input1
+  - group: imu
+    iio:
+      name: i2c-BMI0260:00
+      mount_matrix:
+        x: [-1, 0, 0]
+        y: [0, -1, 0]
+        z: [0, 0, 1]
 
 # Optional configuration for the composite device
 options:
@@ -72,4 +69,8 @@ options:
 # The target input device(s) to emulate by default
 target_devices:
   - xbox-elite
+  - mouse
   - keyboard
+
+# The ID of a device event mapping in the 'event_maps' folder
+capability_map_id: gpd3
