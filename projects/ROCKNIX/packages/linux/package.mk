@@ -76,6 +76,10 @@ if [[ "${TARGET_ARCH}" =~ i*86|x86_64 ]]; then
   PKG_DEPENDS_UNPACK+=" intel-ucode kernel-firmware"
 fi
 
+if [ "${DEVICE}" = "SM8750" ]; then
+  PKG_DEPENDS_UNPACK+=" extra-firmware"
+fi
+
 # Ensure that the dependencies of initramfs:target are built correctly, but
 # we don't want to add initramfs:target as a direct dependency as we install
 # this "manually" from within linux:target
@@ -217,6 +221,14 @@ pre_make_target() {
       cp -Lv $(get_build_dir kernel-firmware)/.copied-firmware/qcom/sm8250/cdsp.mbn ${PKG_BUILD}/external-firmware/qcom/sm8250
       cp $(get_build_dir kernel-firmware)/.copied-firmware/qcom/sm8250/Thundercomm/RB5/* $(get_build_dir kernel-firmware)/.copied-firmware/qcom/sm8250/
       cp -Lv $(get_build_dir kernel-firmware)/.copied-firmware/qcom/sm8250/slpi.mbn ${PKG_BUILD}/external-firmware/qcom/sm8250
+
+    FW_LIST="$(find ${PKG_BUILD}/external-firmware -type f | sed 's|.*external-firmware/||' | sort | xargs)"
+
+    ${PKG_BUILD}/scripts/config --set-str CONFIG_EXTRA_FIRMWARE "${FW_LIST}"
+    ${PKG_BUILD}/scripts/config --set-str CONFIG_EXTRA_FIRMWARE_DIR "external-firmware"
+  elif [ "${TARGET_ARCH}" = "aarch64" -a "${DEVICE}" = "SM8750" ]; then
+    mkdir -p ${PKG_BUILD}/external-firmware/qcom
+      cp -Lv $(get_build_dir extra-firmware)/SM8750/qcom/sm8750/gen80000_zap.mbn ${PKG_BUILD}/external-firmware/qcom/
 
     FW_LIST="$(find ${PKG_BUILD}/external-firmware -type f | sed 's|.*external-firmware/||' | sort | xargs)"
 
