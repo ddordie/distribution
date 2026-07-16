@@ -1,0 +1,4 @@
+#!/bin/bash
+# Set GPU devfreq governor to performance on SM8750
+# simple_ondemand fails to scale due to GMU load reporting issues
+echo performance > /sys/class/devfreq/3d00000.gpu/governor 2>/dev/null || true

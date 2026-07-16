@@ -49,9 +49,7 @@ index 18fb52c..d5ed070 100644
 +				 <&gcc GCC_GPU_GPLL0_DIV_CLK_SRC>;
 +
 +			power-domains = <&rpmhpd RPMHPD_MX>,
-+					<&rpmhpd RPMHPD_CX>,
-+					<&rpmhpd RPMHPD_GFX>,
-+					<&rpmhpd RPMHPD_MXC>;
++					<&rpmhpd RPMHPD_CX>;
 +			required-opps = <&rpmhpd_opp_low_svs>,
 +					<&rpmhpd_opp_low_svs>;
 +			#clock-cells = <1>;
