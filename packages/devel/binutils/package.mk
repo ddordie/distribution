@@ -22,6 +22,7 @@ PKG_CONFIGURE_OPTS_HOST="--target=${TARGET_NAME} \
                          --disable-multilib \
                          --disable-libada \
                          --disable-libssp \
+                         --disable-gprofng \
                          --enable-version-specific-runtime-libs \
                          --enable-plugins \
                          --enable-gold \
@@ -58,6 +59,10 @@ make_host() {
   make configure-host
   # override the makeinfo binary with true - this does not build the documentation
   make MAKEINFO=true
+}
+
+pre_configure_host() {
+  export CFLAGS="${CFLAGS} -std=gnu99"
 }
 
 makeinstall_host() {

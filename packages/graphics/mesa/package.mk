@@ -4,7 +4,7 @@
 
 PKG_NAME="mesa"
 PKG_VERSION="26.2.0"
-PKG_SHA256="7d3b24b10424576affe38f548e69248b669af4bc5cf1adf941435e08a19ead32"
+PKG_SHA256="a8664c858d21ed1dc655896954f033f49c76fe1402e5928c2c62121137f3d25b"
 PKG_URL="https://mesa.freedesktop.org/archive/mesa-${PKG_VERSION}.tar.xz"
 PKG_SITE="http://www.mesa3d.org/"
 PKG_DEPENDS_HOST="toolchain:host expat:host libclc:host libdrm:host Mako:host pyyaml:host spirv-tools:host"

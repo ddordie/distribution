@@ -40,6 +40,10 @@ PKG_CONFIGURE_OPTS_TARGET="utrace_cv_cc_biarch=false \
                            --without-bzlib \
                            --without-lzma"
 
+pre_configure_host() {
+  export CFLAGS="${CFLAGS} -Wno-error=discarded-qualifiers"
+}
+
 pre_configure_target() {
   export PKG_CONFIG="${PKG_CONFIG} --static"
 }

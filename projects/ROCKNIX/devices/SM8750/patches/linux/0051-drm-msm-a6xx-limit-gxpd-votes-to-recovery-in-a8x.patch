@@ -111,4 +111,3 @@ Signed-off-by: Taniya Das <taniya.das@oss.qualcomm.com>
 +	a6xx_gmu_gxpd_put(gmu);
  
  	clk_bulk_disable_unprepare(gmu->nr_clocks, gmu->clocks);
- 
