@@ -25,7 +25,7 @@ make_host() {
   rm -rf ${PKG_BUILD}/dist
 
   INCLUDES="-I${TOOLCHAIN}/include" \
-    CFLAGS="-Wno-error=discarded-qualifiers" \
+    XCFLAGS="-Wno-error=discarded-qualifiers" \
     make BUILD_OPT=1 USE_64=1 \
     PREFIX=${TOOLCHAIN} \
     NSPR_INCLUDE_DIR=${TOOLCHAIN}/include/nspr \
