@@ -61,10 +61,6 @@ make_host() {
   make MAKEINFO=true
 }
 
-pre_configure_host() {
-  export CFLAGS="${CFLAGS} -std=gnu99"
-}
-
 makeinstall_host() {
   cp -v ../include/libiberty.h ${SYSROOT_PREFIX}/usr/include
   make -C libsframe install # bfd is reliant on libsframe
