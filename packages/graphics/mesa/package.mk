@@ -3,9 +3,9 @@
 # Copyright (C) 2018-present Team LibreELEC (https://libreelec.tv)
 
 PKG_NAME="mesa"
-PKG_VERSION="26.2.0"
-PKG_SHA256="a8664c858d21ed1dc655896954f033f49c76fe1402e5928c2c62121137f3d25b"
-PKG_URL="https://mesa.freedesktop.org/archive/mesa-${PKG_VERSION}.tar.xz"
+PKG_VERSION="26.2.0-rc1"
+PKG_SHA256="8cf8f80b3bcad294664cbc1c197e121118d50b203f4d10b3fd3cb670a14c270c"
+PKG_URL="https://archive.mesa3d.org/mesa-${PKG_VERSION}.tar.xz"
 PKG_SITE="http://www.mesa3d.org/"
 PKG_DEPENDS_HOST="toolchain:host expat:host libclc:host libdrm:host Mako:host pyyaml:host spirv-tools:host"
 PKG_DEPENDS_TARGET="toolchain expat libdrm Mako:host pyyaml:host"
