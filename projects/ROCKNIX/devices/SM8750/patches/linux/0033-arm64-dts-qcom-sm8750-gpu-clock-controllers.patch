@@ -9,7 +9,7 @@ Carry only the dtsi provider nodes + clock-binding includes (the rest
 of the old 0000_to_0025 enablement is now upstream).
 ---
  arch/arm64/boot/dts/qcom/sm8750.dtsi | 68 ++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+ 1 file changed, 68 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
 index 18fb52c..d5ed070 100644
@@ -25,7 +25,7 @@ index 18fb52c..d5ed070 100644
  #include <dt-bindings/clock/qcom,sm8750-tcsr.h>
  #include <dt-bindings/clock/qcom,sm8750-videocc.h>
  #include <dt-bindings/dma/qcom-gpi.h>
-@@ -3436,6 +3438,38 @@ dispcc: clock-controller@af00000 {
+@@ -3436,6 +3438,34 @@ dispcc: clock-controller@af00000 {
  			#power-domain-cells = <1>;
  		};
  
@@ -49,12 +49,8 @@ index 18fb52c..d5ed070 100644
 +				 <&gcc GCC_GPU_GPLL0_DIV_CLK_SRC>;
 +
 +			power-domains = <&rpmhpd RPMHPD_MX>,
-+					<&rpmhpd RPMHPD_CX>,
-+					<&rpmhpd RPMHPD_GFX>,
-+					<&rpmhpd RPMHPD_MXC>;
++					<&rpmhpd RPMHPD_CX>;
 +			required-opps = <&rpmhpd_opp_low_svs>,
-+					<&rpmhpd_opp_low_svs>,
-+					<&rpmhpd_opp_low_svs>,
 +					<&rpmhpd_opp_low_svs>;
 +			#clock-cells = <1>;
 +			#reset-cells = <1>;
@@ -64,7 +60,7 @@ index 18fb52c..d5ed070 100644
  		pdc: interrupt-controller@b220000 {
  			compatible = "qcom,sm8750-pdc", "qcom,pdc";
  			reg = <0x0 0x0b220000 0x0 0x10000>, <0x0 0x164400f0 0x0 0x64>;
-@@ -4998,6 +5032,44 @@ tpdm_swao_out: endpoint {
+@@ -4998,6 +5028,44 @@ tpdm_swao_out: endpoint {
  			};
  		};
  
