@@ -178,12 +178,18 @@ install_proton_variant() {
 }
 
 install_proton_cachyos() {
-  install_proton_variant \
+  local url="${GITHUB_PROXY}${PROTON_CACHYOS_URL}"
+  local url_fallback="${PROTON_CACHYOS_URL}"
+  log_info "Downloading Proton-CachyOS from ${url}..."
+  if ! install_proton_variant "Proton-CachyOS" "${url}" "${PROTON_CACHYOS_TAR}" "${PROTON_CACHYOS_DIR}" "proton-cachyos-*-arm64"; then
+    log_info "Proxy failed, trying direct..."
+    install_proton_variant \
     "Proton-CachyOS" \
-    "${PROTON_CACHYOS_URL}" \
+    "${url_fallback}" \
     "${PROTON_CACHYOS_TAR}" \
     "${PROTON_CACHYOS_DIR}" \
     "proton-cachyos-*-arm64"
+  fi
 }
 
 install_proton_ge() {
