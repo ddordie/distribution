@@ -27,6 +27,20 @@ PROTON_CACHYOS_VERSION_FULL="11.0-20260702-slr"
 PROTON_CACHYOS_TAR="proton-cachyos-${PROTON_CACHYOS_VERSION_FULL}-arm64.tar.xz"
 PROTON_CACHYOS_DIR="proton-cachyos-${PROTON_CACHYOS_VERSION_FULL}-arm64"
 PROTON_CACHYOS_URL="https://github.com/CachyOS/proton-cachyos/releases/download/cachyos-${PROTON_CACHYOS_VERSION_FULL}/${PROTON_CACHYOS_TAR}"
+
+GITHUB_PROXY=""
+_best=999
+for _p in https://ghfast.top/ https://gh.ddlc.top/ https://gh-proxy.com/; do
+  _t=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 --max-time 10 "${_p}https://github.com" 2>/dev/null)
+  if [ -n "$_t" ] && [ "$_t" != "0.000" ] && [ "$_t" != "0" ]; then
+    _ti=${_t%%.*}
+    if [ "$_ti" -lt "$_best" ]; then
+      _best=$_ti
+      GITHUB_PROXY="$_p"
+    fi
+  fi
+done
+
 PROTON_GE_VERSION_FULL="GE-Proton11-1"
 PROTON_GE_TAR="${PROTON_GE_VERSION_FULL}-aarch64.tar.gz"
 PROTON_GE_DIR="${PROTON_GE_VERSION_FULL}-aarch64"

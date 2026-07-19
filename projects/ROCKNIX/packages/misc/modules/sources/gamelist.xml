@@ -169,6 +169,30 @@
         <image>./images/heroic.svg</image>
     </game>
     <game>
+        <path>./Install Asian Fonts.sh</path>
+        <name>Install Noto CJK Fonts</name>
+        <desc>Downloads and installs Noto CJK fonts for Asian language support in Steam, Heroic, and other applications.</desc>
+        <developer>Noto Fonts</developer>
+        <publisher>Noto Fonts</publisher>
+        <rating>5.0</rating>
+        <releasedate>2024</releasedate>
+        <genre>Tool</genre>
+        <players>1</players>
+        <image>./images/noto-cjk.svg</image>
+    </game>
+    <game>
+        <path>./Install Asian Fonts - Uninstall.sh</path>
+        <name>Uninstall Noto CJK Fonts</name>
+        <desc>Removes installed Noto CJK fonts and restores system default fonts.</desc>
+        <developer>Noto Fonts</developer>
+        <publisher>Noto Fonts</publisher>
+        <rating>5.0</rating>
+        <releasedate>2024</releasedate>
+        <genre>Tool</genre>
+        <players>1</players>
+        <image>./images/noto-cjk.svg</image>
+    </game>
+    <game>
         <path>./Start AetherSX2.sh</path>
         <name>Start AetherSX2</name>
         <desc>Opens the AetherSX2 GUI (PS2) to enable global configuration changes to be made directly to the emulator. It's recommended to have a mouse 
