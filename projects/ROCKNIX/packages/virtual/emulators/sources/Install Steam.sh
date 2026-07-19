@@ -150,6 +150,7 @@ install_proton_variant() {
   local tar_name="$3"
   local dir_name="$4"
   local cleanup_glob="$5"
+  local allow_fail="${6:-0}"
 
   local dest_dir="${STEAM}/compatibilitytools.d"
   local tar_path="${dest_dir}/${tar_name}"
@@ -173,7 +174,13 @@ install_proton_variant() {
 
   log_info "Downloading and installing ${display_name}..."
   mkdir -p "${dest_dir}"
-  wget -c -t 5 -O "${tar_path}" "$url" || die "Failed to download ${display_name}."
+  wget -c -t 5 -O "${tar_path}" "$url" || {
+    if [ "$allow_fail" = "1" ]; then
+      log_info "Failed to download ${display_name} (will retry)."
+      return 1
+    fi
+    die "Failed to download ${display_name}."
+  }
   tar -xvf "${tar_path}" -C "${dest_dir}" || die "Failed to extract ${display_name}."
   rm -f "${tar_path}"
 
@@ -184,13 +191,12 @@ install_proton_variant() {
 
 install_proton_cachyos() {
   local url="${GITHUB_PROXY}${PROTON_CACHYOS_URL}"
-  local url_fallback="${PROTON_CACHYOS_URL}"
   log_info "Downloading Proton-CachyOS from ${url}..."
-  if ! install_proton_variant "Proton-CachyOS" "${url}" "${PROTON_CACHYOS_TAR}" "${PROTON_CACHYOS_DIR}" "proton-cachyos-*-arm64"; then
+  if ! install_proton_variant "Proton-CachyOS" "${url}" "${PROTON_CACHYOS_TAR}" "${PROTON_CACHYOS_DIR}" "proton-cachyos-*-arm64" 1; then
     log_info "Proxy failed, trying direct..."
     install_proton_variant \
     "Proton-CachyOS" \
-    "${url_fallback}" \
+    "${PROTON_CACHYOS_URL}" \
     "${PROTON_CACHYOS_TAR}" \
     "${PROTON_CACHYOS_DIR}" \
     "proton-cachyos-*-arm64"
