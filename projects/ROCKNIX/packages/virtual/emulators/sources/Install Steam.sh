@@ -204,12 +204,17 @@ install_proton_cachyos() {
 }
 
 install_proton_ge() {
-  install_proton_variant \
+  local url="${GITHUB_PROXY}${PROTON_GE_URL}"
+  log_info "Downloading Proton-GE from ${url}..."
+  if ! install_proton_variant "Proton-GE" "${url}" "${PROTON_GE_TAR}" "${PROTON_GE_DIR}" "GE-Proton*-aarch64" 1; then
+    log_info "Proxy failed, trying direct..."
+    install_proton_variant \
     "Proton-GE" \
     "${PROTON_GE_URL}" \
     "${PROTON_GE_TAR}" \
     "${PROTON_GE_DIR}" \
     "GE-Proton*-aarch64"
+  fi
 }
 
 run_steam_first_launch() {
