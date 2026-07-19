@@ -10,7 +10,7 @@ HEROIC_TAR_URL="https://github.com/trescenzi/heroic_builder/releases/download/v$
 GITHUB_PROXY=""
 _best=999
 for _p in https://ghfast.top/ https://gh.ddlc.top/ https://gh-proxy.com/; do
-  _t=$(wget --spider --timeout=5 -t 1 "${_p}https://github.com" 2>&1 | sed -n 's/.*\[\([0-9.]*\)s\].*/\1/p' | head -1)
+  _t=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 --max-time 10 "${_p}https://github.com" 2>/dev/null || true)
   if [ -n "$_t" ] && [ "$_t" != "0.000" ] && [ "$_t" != "0" ]; then
     _ti=${_t%%.*}
     if [ "$_ti" -lt "$_best" ] 2>/dev/null; then
@@ -20,10 +20,9 @@ for _p in https://ghfast.top/ https://gh.ddlc.top/ https://gh-proxy.com/; do
   fi
 done
 
-# Fallback: pick first proxy if none detected (e.g. curl/wget detection failed)
+# Fallback: pick first proxy if none detected
 if [ -z "$GITHUB_PROXY" ]; then
   GITHUB_PROXY="https://ghfast.top/"
-  echo "[INFO] Proxy detection failed, using default: ${GITHUB_PROXY}"
 fi
 HEROIC_BIN=""
 
