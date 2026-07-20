@@ -1,0 +1,33 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2024 ROCKNIX (https://github.com/ROCKNIX)
+
+# Per-policy max frequency caps for thermal optimization
+# Lowers CPU heat output so GPU can sustain higher clocks
+#
+# Policy0 (cores 0-1, small):  2.23 GHz
+# Policy2 (cores 2-4, small):  2.23 GHz
+# Policy5 (core 5, big):       2.25 GHz
+# Policy7 (cores 6-7, big):    2.25 GHz
+
+cat <<'EOF' >/storage/.config/profile.d/011-cpufreq
+CPU_MAX_FREQ=(
+  "2230000"  # policy0 - small cluster group 1
+  "2230000"  # policy2 - small cluster group 2
+  "2250000"  # policy5 - big core
+  "2250000"  # policy7 - big cores
+)
+
+apply_cpu_max_freq() {
+  local idx=0
+  for POLICY in "${CPU_FREQ[@]}"; do
+    [ -w "${POLICY}/scaling_governor" ] || continue
+    [ -w "${POLICY}/scaling_max_freq" ] || continue
+
+    # Use schedutil so max_freq cap is actually enforced
+    echo "schedutil" > "${POLICY}/scaling_governor" 2>/dev/null
+    echo "${CPU_MAX_FREQ[$idx]}" > "${POLICY}/scaling_max_freq" 2>/dev/null
+    idx=$((idx + 1))
+  done
+}
+apply_cpu_max_freq
